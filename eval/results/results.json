@@ -1,0 +1,29 @@
+{
+  "bicubic": {
+    "psnr_mean": 41.1756,
+    "psnr_std": 0.8479,
+    "ssim_mean": 0.9662,
+    "ssim_std": 0.0034,
+    "lpips_mean": null,
+    "n_patches": 60,
+    "elapsed_s": 1.5
+  },
+  "lanczos": {
+    "psnr_mean": 41.5969,
+    "psnr_std": 0.88,
+    "ssim_mean": 0.9696,
+    "ssim_std": 0.0034,
+    "lpips_mean": null,
+    "n_patches": 60,
+    "elapsed_s": 0.8
+  },
+  "evoland": {
+    "psnr_mean": 40.8317,
+    "psnr_std": 0.8185,
+    "ssim_mean": 0.9657,
+    "ssim_std": 0.0032,
+    "lpips_mean": null,
+    "n_patches": 60,
+    "elapsed_s": 60.3
+  }
+}

@@ -1,0 +1,254 @@
+<!doctype html>
+<html>
+<head>
+  <title>Sentinel-2 Gaza | SR Benchmark</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Segoe UI", sans-serif; }
+    #map { height: 100vh; }
+
+    /* ── Method selector ────────────────────────────────────────────── */
+    #controls {
+      position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 1000; background: rgba(10,14,20,0.88); color: white;
+      padding: 14px 22px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);
+      text-align: center; backdrop-filter: blur(4px);
+    }
+    #controls-label {
+      font-size: 0.68em; letter-spacing: 0.1em; text-transform: uppercase;
+      color: rgba(255,255,255,0.35); margin-bottom: 10px;
+    }
+    #method-row { display: flex; gap: 8px; justify-content: center; }
+    .method-btn {
+      background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5);
+      border: 1px solid rgba(255,255,255,0.15); border-radius: 5px;
+      padding: 6px 16px; font-size: 0.78em; font-weight: 600; cursor: pointer;
+      letter-spacing: 0.06em; text-transform: uppercase; transition: all 0.15s;
+    }
+    .method-btn.active { background: rgba(100,181,246,0.2); color: #64b5f6; border-color: #64b5f6; }
+
+    /* ── Swipe divider ──────────────────────────────────────────────── */
+    #divider {
+      position: absolute; top: 0; bottom: 0; left: 50%;
+      width: 3px; background: rgba(255,255,255,0.85);
+      cursor: ew-resize; z-index: 999; transform: translateX(-50%);
+    }
+    #divider-handle {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255,255,255,0.92); color: #111;
+      padding: 5px 8px; border-radius: 4px; font-size: 14px;
+      pointer-events: none; white-space: nowrap;
+    }
+    #left-label, #right-label {
+      position: absolute; top: 16px; z-index: 1000;
+      background: rgba(10,14,20,0.75); color: rgba(255,255,255,0.7);
+      padding: 5px 12px; border-radius: 6px; font-size: 0.72em;
+      font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
+      backdrop-filter: blur(3px);
+    }
+    #left-label  { left: 16px; }
+    #right-label { right: 16px; }
+
+    /* ── Benchmark scores panel ─────────────────────────────────────── */
+    #scores-panel {
+      position: absolute; top: 20px; right: 20px; z-index: 1000;
+      background: rgba(10,14,20,0.88); color: white;
+      padding: 14px 16px; border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.1);
+      min-width: 220px; backdrop-filter: blur(4px);
+    }
+    #scores-panel h4 {
+      margin: 0 0 10px; font-size: 0.72em; letter-spacing: 0.1em;
+      text-transform: uppercase; color: rgba(255,255,255,0.45);
+    }
+    .scores-table { width: 100%; border-collapse: collapse; font-size: 0.8em; }
+    .scores-table th { text-align: left; padding: 3px 6px; color: rgba(255,255,255,0.35); border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .scores-table td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .scores-table tr.best td { color: #69f0ae; }
+    .scores-table tr.current td { font-weight: 700; color: #64b5f6; }
+    #scores-note { font-size: 0.68em; color: rgba(255,255,255,0.3); margin-top: 8px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div id="map">
+    <div id="divider"><div id="divider-handle">&#8660;</div></div>
+  </div>
+
+  <div id="left-label">Original 10m</div>
+  <div id="right-label">SR</div>
+
+  <!-- Method selector -->
+  <div id="controls">
+    <div id="controls-label">SR Method &mdash; Aug 27 2024 &middot; Gaza Strip</div>
+    <div id="method-row"></div>
+  </div>
+
+  <!-- Benchmark scores -->
+  <div id="scores-panel">
+    <h4>SR Benchmark &middot; SEN2VENuS test set</h4>
+    <table class="scores-table">
+      <thead><tr><th>Method</th><th>PSNR</th><th>SSIM</th></tr></thead>
+      <tbody id="scores-body">
+        <tr><td colspan="3" style="color:rgba(255,255,255,0.25)">Loading&hellip;</td></tr>
+      </tbody>
+    </table>
+    <div id="scores-note">Scores vs. real VENuS 5m ground truth.<br>Visual: Sentinel-2 L2A, MGRS 36RXV.</div>
+  </div>
+
+  <script>
+    const TILES = "http://localhost:8002/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png";
+    const IMAGERY_BOUNDS = L.latLngBounds([[30.626, 34.044], [31.631, 35.212]]);
+
+    const map = L.map("map", {
+      maxBounds: IMAGERY_BOUNDS, maxBoundsViscosity: 1.0,
+      minZoom: 11, maxZoom: 18,
+    }).setView([31.38, 34.40], 13);
+
+    function updateMinZoom() {
+      const z = map.getBoundsZoom(IMAGERY_BOUNDS) + 1;
+      map.setMinZoom(z);
+      if (map.getZoom() < z) map.setZoom(z);
+    }
+    map.on("resize", updateMinZoom);
+    map.whenReady(updateMinZoom);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors",
+    }).addTo(map);
+
+    // ── Panes ────────────────────────────────────────────────────────
+    map.createPane("leftPane");
+    map.createPane("rightPane");
+    map.getPane("leftPane").style.zIndex  = 300;
+    map.getPane("rightPane").style.zIndex = 300;
+
+    // ── Swipe divider ────────────────────────────────────────────────
+    const dividerEl  = document.getElementById("divider");
+    const mapEl      = document.getElementById("map");
+    const rightLabel = document.getElementById("right-label");
+    let dividerPos = 0.5, dragging = false;
+
+    function updateClip() {
+      const w = mapEl.clientWidth, h = mapEl.clientHeight;
+      const px = Math.round(w * dividerPos);
+      dividerEl.style.left = px + "px";
+
+      const nw    = map.containerPointToLayerPoint([0, 0]);
+      const se    = map.containerPointToLayerPoint([w, h]);
+      const clipX = nw.x + px;
+      map.getPane("leftPane").style.clip  = "rect(" + nw.y + "px," + clipX + "px," + se.y + "px," + nw.x + "px)";
+      map.getPane("rightPane").style.clip = "rect(" + nw.y + "px," + se.x  + "px," + se.y + "px," + clipX + "px)";
+
+      // Keep right label inside the right panel
+      rightLabel.style.right = (w - px + 8) + "px";
+    }
+
+    dividerEl.addEventListener("mousedown", function(e) {
+      dragging = true; e.preventDefault(); e.stopPropagation();
+      map.dragging.disable();
+    });
+    document.addEventListener("mousemove", function(e) {
+      if (!dragging) return;
+      var r = mapEl.getBoundingClientRect();
+      dividerPos = Math.max(0.05, Math.min(0.95, (e.clientX - r.left) / r.width));
+      updateClip();
+    });
+    document.addEventListener("mouseup", function() {
+      if (dragging) { dragging = false; map.dragging.enable(); }
+    });
+    map.on("move zoom resize moveend zoomend", function() { requestAnimationFrame(updateClip); });
+
+    // ── State ────────────────────────────────────────────────────────
+    var originalPath = null, srMethods = {}, currentMethod = null;
+    var leftLayer = null, rightLayer = null;
+
+    function tileUrl(path) {
+      return TILES + "?url=" + encodeURIComponent(path);
+    }
+
+    function loadMethod(name) {
+      currentMethod = name;
+      document.querySelectorAll(".method-btn").forEach(function(b) {
+        b.classList.toggle("active", b.dataset.method === name);
+      });
+      document.getElementById("right-label").textContent = name.toUpperCase();
+      document.querySelectorAll(".scores-table tr[data-method]").forEach(function(tr) {
+        tr.classList.toggle("current", tr.dataset.method === name);
+      });
+
+      if (leftLayer)  { map.removeLayer(leftLayer);  leftLayer  = null; }
+      if (rightLayer) { map.removeLayer(rightLayer); rightLayer = null; }
+
+      if (originalPath) {
+        leftLayer = L.tileLayer(tileUrl(originalPath),
+          { pane: "leftPane", opacity: 0.88, attribution: "Copernicus Sentinel-2" }).addTo(map);
+      }
+
+      var scenes = srMethods[name] || [];
+      var scene  = scenes.find(function(s) { return s.date === "2024-08-27"; }) || scenes[0];
+      if (scene) {
+        rightLayer = L.tileLayer(tileUrl(scene.path),
+          { pane: "rightPane", opacity: 0.88, attribution: "Copernicus Sentinel-2 SR" }).addTo(map);
+      }
+
+      requestAnimationFrame(updateClip);
+    }
+
+    // ── Bootstrap ────────────────────────────────────────────────────
+    async function init() {
+      var results = await Promise.all([
+        fetch("/scenes").then(function(r) { return r.json(); }),
+        fetch("/sr/scenes").then(function(r) { return r.json(); }),
+        fetch("/results").then(function(r) { return r.json(); }).catch(function() { return {}; }),
+      ]);
+      var tciData = results[0], srData = results[1], resultsData = results[2];
+
+      // Use Aug 27 as the reference original
+      var scenes = tciData.scenes || [];
+      var aug27  = scenes.find(function(s) { return s.date === "2024-08-27"; }) || scenes[0];
+      if (aug27) originalPath = aug27.path;
+
+      srMethods = srData.methods || {};
+
+      // Build method buttons — only methods that have an Aug 27 scene
+      var methodRow = document.getElementById("method-row");
+      var methods = Object.keys(srMethods).filter(function(name) {
+        return srMethods[name].some(function(s) { return s.date === "2024-08-27"; });
+      });
+      methods.forEach(function(name) {
+        var btn = document.createElement("button");
+        btn.className = "method-btn";
+        btn.textContent = name;
+        btn.dataset.method = name;
+        btn.onclick = function() { loadMethod(name); };
+        methodRow.appendChild(btn);
+      });
+
+      // Populate benchmark scores
+      var modelNames = Object.keys(resultsData);
+      if (modelNames.length) {
+        var bestPSNR = modelNames.reduce(function(a, b) {
+          return resultsData[a].psnr_mean > resultsData[b].psnr_mean ? a : b;
+        });
+        var tbody = document.getElementById("scores-body");
+        tbody.innerHTML = "";
+        modelNames.forEach(function(name) {
+          var r = resultsData[name];
+          var tr = document.createElement("tr");
+          tr.dataset.method = name;
+          if (name === bestPSNR) tr.classList.add("best");
+          tr.innerHTML = "<td>" + name + "</td><td>" + r.psnr_mean.toFixed(2) + " dB</td><td>" + r.ssim_mean.toFixed(4) + "</td>";
+          tbody.appendChild(tr);
+        });
+      }
+
+      if (methods.length) loadMethod(methods[0]);
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Large data — not committed; see README for download instructions
+data/patches/
+data/raw/
+
+# Model weights — downloaded at runtime
+models/weights/
+
+# Evaluation outputs (large arrays — results.json is committed)
+eval/results/*.npy
+
+# Generated imagery — large binary files, reproduced by running sr/process.py
+sr_renders/
+
+# Intermediate COG exports
+data/cogs/
+
+# Scratch
+archive/
