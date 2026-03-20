@@ -10,6 +10,7 @@ data/raw/
 
 # Model weights — downloaded at runtime
 models/weights/
+weights/
 
 # Evaluation outputs (large arrays — results.json is committed)
 eval/results/*.npy

@@ -6,7 +6,7 @@
     "ssim_std": 0.0034,
     "lpips_mean": null,
     "n_patches": 60,
-    "elapsed_s": 1.5
+    "elapsed_s": 0.8
   },
   "lanczos": {
     "psnr_mean": 41.5969,
@@ -24,6 +24,15 @@
     "ssim_std": 0.0032,
     "lpips_mean": null,
     "n_patches": 60,
-    "elapsed_s": 60.3
+    "elapsed_s": 59.4
+  },
+  "esrgan": {
+    "psnr_mean": 45.319,
+    "psnr_std": 1.7895,
+    "ssim_mean": 0.9552,
+    "ssim_std": 0.0077,
+    "lpips_mean": null,
+    "n_patches": 60,
+    "elapsed_s": 2.8
   }
 }

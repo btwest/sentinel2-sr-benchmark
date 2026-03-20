@@ -82,7 +82,10 @@ def run_benchmark(split: str, model_names: list[str] | None, max_patches: int | 
             sr = model.upscale(lr)
             h, w = hr.shape[-2], hr.shape[-1]
             sr = sr[..., :h, :w]
-            m = evaluate_all(sr, hr)
+            # Align channels: if model outputs fewer bands than HR ground truth
+            # (e.g. ESRGAN is RGB-only, HR has 4 bands), compare only shared bands
+            n_ch = min(sr.shape[0], hr.shape[0])
+            m = evaluate_all(sr[:n_ch], hr[:n_ch])
             scores["psnr"].append(m["psnr"])
             scores["ssim"].append(m["ssim"])
             if m["lpips"] is not None:

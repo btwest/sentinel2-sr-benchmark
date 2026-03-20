@@ -40,6 +40,12 @@ def get_models(names: list[str] | None):
     except (ImportError, FileNotFoundError):
         pass
 
+    try:
+        from models.esrgan import RealESRGANModel
+        all_models.append(RealESRGANModel())
+    except (ImportError, FileNotFoundError):
+        pass
+
     if names:
         return [m for m in all_models if m.name in names]
     return all_models
