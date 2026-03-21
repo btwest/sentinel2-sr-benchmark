@@ -23,3 +23,8 @@ data/cogs/
 
 # Scratch
 archive/
+
+# Training data and artifacts
+data/sen2naip/
+logs/
+wandb/

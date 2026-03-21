@@ -1,0 +1,97 @@
+# ============================================================================ #
+# Training config for sentinel2-sr-benchmark
+# SRGAN trained on SEN2NAIPv2 cross-sensor subset
+# 4x upscale: Sentinel-2 10m -> 2.5m equivalent
+# ============================================================================ #
+
+Data:
+  train_batch_size: 4
+  val_batch_size: 2
+  num_workers: 8
+  prefetch_factor: 4
+  dataset_type: 'SEN2NAIP'
+  normalization: 'normalise_10k'
+  sen2naip_taco_file: 'data/sen2naip/sen2naipv2-crosssensor.taco'
+
+Model:
+  in_bands: 4
+  continue_training: False
+  load_checkpoint: False
+
+Training:
+  device: "cuda"
+  gpus: [0]                    # Single RTX 3080
+  max_epochs: 200              # Early stopping will kick in well before this
+  val_check_interval: 1.
+  limit_val_batches: 50
+
+  pretrain_g_only: True
+  g_pretrain_steps: 5000       # Generator-only warmup before adversarial kicks in
+  adv_loss_ramp_steps: 500
+  label_smoothing: True
+
+  EMA:
+    enabled: True              # Smoother weights = better inference quality
+    decay: 0.999
+    update_after_step: 0
+    use_num_updates: True
+
+  Losses:
+    adv_loss_type: 'bce'
+    relativistic_average_d: False
+    adv_loss_beta: 0.001
+    adv_loss_schedule: 'cosine'
+    r1_gamma: 0.0
+    l1_weight: 1.0
+    sam_weight: 0.1
+    perceptual_weight: 0.05
+    perceptual_metric: 'vgg'
+    fixed_idx: [0, 1, 2]       # RGB channels for perceptual loss
+    tv_weight: 0.0
+    max_val: 1.0
+    ssim_win: 11
+
+Generator:
+  model_type: 'esrgan'
+  block_type: 'rrdb'
+  large_kernel_size: 9
+  small_kernel_size: 3
+  n_channels: 32               # Reduced from 64 for faster training
+  n_blocks: 6                  # Reduced from 8
+  scaling_factor: 4            # 10m -> 2.5m
+  growth_channels: 16          # Reduced from 32
+  res_scale: 0.2
+  use_icnr: True
+
+Discriminator:
+  model_type: 'patchgan'       # Much lighter than esrgan discriminator
+  n_blocks: 4
+  use_spectral_norm: True      # Helps stability with lighter discriminator
+  base_channels: 32
+  linear_size: 512
+
+Optimizers:
+  optim_g_lr: 1e-5
+  optim_d_lr: 5e-5
+  gradient_clip_val: 0
+  betas: [0.0, 0.99]
+  eps: 1.0e-7
+  weight_decay_g: 0.0
+  weight_decay_d: 0.0
+
+Schedulers:
+  g_warmup_steps: 0
+  g_warmup_type: 'linear'
+  metric_g: 'val_metrics/l1'
+  metric_d: 'discriminator/adversarial_loss'
+  patience_g: 10
+  patience_d: 10
+  factor_g: 0.5
+  factor_d: 0.5
+
+Logging:
+  num_val_images: 5
+  wandb:
+    enabled: True
+    entity: "brendantwest-cornell-university"
+    project: "sentinel2-sr-benchmark"

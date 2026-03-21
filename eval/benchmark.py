@@ -42,6 +42,12 @@ def get_models(names: list[str] | None):
     except (ImportError, FileNotFoundError):
         pass
 
+    try:
+        from models.srgan import SRGANModel
+        all_models.append(SRGANModel())
+    except (ImportError, FileNotFoundError):
+        pass
+
     if names:
         return [m for m in all_models if m.name in names]
     return all_models

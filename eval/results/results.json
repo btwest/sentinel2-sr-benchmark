@@ -6,7 +6,7 @@
     "ssim_std": 0.0034,
     "lpips_mean": null,
     "n_patches": 60,
-    "elapsed_s": 0.8
+    "elapsed_s": 0.7
   },
   "lanczos": {
     "psnr_mean": 41.5969,
@@ -15,7 +15,7 @@
     "ssim_std": 0.0034,
     "lpips_mean": null,
     "n_patches": 60,
-    "elapsed_s": 0.8
+    "elapsed_s": 0.9
   },
   "evoland": {
     "psnr_mean": 40.8317,
@@ -24,15 +24,15 @@
     "ssim_std": 0.0032,
     "lpips_mean": null,
     "n_patches": 60,
-    "elapsed_s": 59.4
+    "elapsed_s": 64.3
   },
-  "esrgan": {
-    "psnr_mean": 45.319,
-    "psnr_std": 1.7895,
-    "ssim_mean": 0.9552,
-    "ssim_std": 0.0077,
+  "srgan": {
+    "psnr_mean": 30.1439,
+    "psnr_std": 2.7066,
+    "ssim_mean": 0.7333,
+    "ssim_std": 0.0615,
     "lpips_mean": null,
     "n_patches": 60,
-    "elapsed_s": 2.8
+    "elapsed_s": 1.7
   }
 }
