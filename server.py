@@ -21,10 +21,65 @@ cog = TilerFactory()
 app.include_router(cog.router, prefix="/cog")
 add_exception_handlers(app, DEFAULT_STATUS_CODES)
 
-RENDERS_DIR = Path("../sentinel-2/renders")   # parent project renders
-SR_DIR      = Path("./sr_renders")            # SR outputs written by sr/process.py
+RENDERS_DIR  = Path("../sentinel-2/renders")
+SR_DIR       = Path("./sr_renders")
 RESULTS_PATH = Path("eval/results/results.json")
 
+# ── Location registry ─────────────────────────────────────────────────────────
+# Each entry defines one viewable location.
+# sr_overrides: use these exact SR_DIR-relative paths instead of the default
+# naming convention (needed for Gaza whose EVOLAND/SRGAN were built before the
+# full-scene-name convention was adopted).
+_LOCATIONS_CFG = [
+    {
+        "id":     "gaza",
+        "name":   "Gaza Strip",
+        "date":   "Aug 27 2024",
+        "center": [31.38, 34.40],
+        "zoom":   13,
+        "tci":    "S2B_MSIL2A_20240827T081609_N0511_R121_T36RXV_20240827T113546_cog.tif",
+        "sr_overrides": {
+            "evoland": "evoland/S2_20240827T081609_evoland_cog.tif",
+            "srgan":   "srgan/S2_20240827T081609_srgan_cog.tif",
+        },
+    },
+    {
+        "id":     "ramstein",
+        "name":   "Ramstein Air Base",
+        "date":   "Mar 19 2026",
+        "center": [49.44, 7.60],
+        "zoom":   13,
+        "tci":    "S2A_MSIL2A_20260319T104041_N0512_R008_T32ULV_20260319T173915_cog.tif",
+    },
+    {
+        "id":     "bandar_abbas",
+        "name":   "Port of Bandar Abbas",
+        "date":   "Mar 18 2026",
+        "center": [27.12, 56.18],
+        "zoom":   13,
+        "tci":    "S2C_MSIL2A_20260318T064631_N0512_R020_T40RDQ_20260318T123223_cog.tif",
+    },
+]
+
+_SR_METHODS = ["bicubic", "lanczos", "esrgan", "evoland", "srgan"]
+
+
+def _resolve_sr(tci_name: str, method: str, overrides: dict) -> Path | None:
+    """Return the SR output Path for a method, or None if the file doesn't exist."""
+    if method in overrides:
+        p = SR_DIR / overrides[method]
+    elif method == "evoland":
+        stem = tci_name.replace("_cog.tif", "")
+        p = SR_DIR / "evoland" / f"{stem}_evoland_cog.tif"
+    elif method == "srgan":
+        stem = tci_name.replace("_cog.tif", "")
+        p = SR_DIR / "srgan" / f"{stem}_srgan_cog.tif"
+    else:
+        p = SR_DIR / method / tci_name
+    return p if p.exists() else None
+
+
+# ── API endpoints ─────────────────────────────────────────────────────────────
 
 def parse_date(filename: str) -> str:
     match = re.search(r"_(\d{8})T\d{6}_", filename)
@@ -40,19 +95,63 @@ def scene_entry(path: Path) -> dict:
     }
 
 
+@app.get("/locations")
+def list_locations():
+    """
+    Structured location data for the scene selector.
+    Returns resolved absolute paths for TCI and each SR method,
+    plus geographic bounds derived from the raster.
+    """
+    import rasterio
+    from rasterio.warp import transform_bounds as _rtb
+
+    out = []
+    for cfg in _LOCATIONS_CFG:
+        tci_path = RENDERS_DIR / cfg["tci"]
+        if not tci_path.exists():
+            continue
+
+        # Geographic bounds from the raster (WGS84)
+        bounds = None
+        try:
+            with rasterio.open(tci_path) as src:
+                w, s, e, n = _rtb(src.crs, "EPSG:4326", *src.bounds)
+            bounds = [[round(s, 4), round(w, 4)], [round(n, 4), round(e, 4)]]
+        except Exception:
+            pass
+
+        # Resolve SR paths — only include methods whose files exist
+        overrides = cfg.get("sr_overrides", {})
+        methods = {}
+        for m in _SR_METHODS:
+            p = _resolve_sr(cfg["tci"], m, overrides)
+            if p:
+                methods[m] = str(p.resolve())
+
+        out.append({
+            "id":       cfg["id"],
+            "name":     cfg["name"],
+            "date":     cfg["date"],
+            "center":   cfg["center"],
+            "zoom":     cfg["zoom"],
+            "bounds":   bounds,
+            "tci_path": str(tci_path.resolve()),
+            "methods":  methods,
+        })
+
+    return out
+
+
 @app.get("/scenes")
 def list_scenes():
-    """Original TCI renders from parent project."""
+    """Original TCI renders — kept for backward compatibility."""
     cogs = sorted(RENDERS_DIR.glob("*_cog.tif"))
     return {"scenes": [scene_entry(p) for p in cogs]}
 
 
 @app.get("/sr/scenes")
 def list_sr_scenes():
-    """
-    SR-processed renders, grouped by method.
-    Returns { method: [scene, ...] } for each available SR method.
-    """
+    """SR renders grouped by method — kept for backward compatibility."""
     if not SR_DIR.exists():
         return {"methods": {}}
     methods = {}

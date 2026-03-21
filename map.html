@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
 <head>
-  <title>Sentinel-2 Gaza | SR Benchmark</title>
+  <title>Sentinel-2 SR Benchmark</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <style>
@@ -9,24 +9,45 @@
     body { margin: 0; font-family: "Segoe UI", sans-serif; }
     #map { height: 100vh; }
 
-    /* ── Method selector ────────────────────────────────────────────── */
+    /* ── Controls panel ─────────────────────────────────────────────── */
     #controls {
       position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
       z-index: 1000; background: rgba(10,14,20,0.88); color: white;
       padding: 14px 22px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);
-      text-align: center; backdrop-filter: blur(4px);
+      text-align: center; backdrop-filter: blur(4px); min-width: 380px;
+    }
+    .row-label {
+      font-size: 0.65em; letter-spacing: 0.12em; text-transform: uppercase;
+      color: rgba(255,255,255,0.3); margin-bottom: 7px;
+    }
+    #location-row, #method-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    #controls-divider {
+      border: none; border-top: 1px solid rgba(255,255,255,0.08);
+      margin: 10px 0;
     }
     #controls-label {
-      font-size: 0.68em; letter-spacing: 0.1em; text-transform: uppercase;
+      font-size: 0.68em; letter-spacing: 0.08em; text-transform: uppercase;
       color: rgba(255,255,255,0.35); margin-bottom: 10px;
     }
-    #method-row { display: flex; gap: 8px; justify-content: center; }
+
+    /* Location buttons */
+    .loc-btn {
+      background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5);
+      border: 1px solid rgba(255,255,255,0.15); border-radius: 5px;
+      padding: 6px 14px; font-size: 0.78em; font-weight: 600; cursor: pointer;
+      letter-spacing: 0.04em; transition: all 0.15s;
+    }
+    .loc-btn:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8); }
+    .loc-btn.active { background: rgba(255,183,77,0.18); color: #ffb74d; border-color: #ffb74d; }
+
+    /* Method buttons */
     .method-btn {
       background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5);
       border: 1px solid rgba(255,255,255,0.15); border-radius: 5px;
       padding: 6px 16px; font-size: 0.78em; font-weight: 600; cursor: pointer;
       letter-spacing: 0.06em; text-transform: uppercase; transition: all 0.15s;
     }
+    .method-btn:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8); }
     .method-btn.active { background: rgba(100,181,246,0.2); color: #64b5f6; border-color: #64b5f6; }
 
     /* ── Swipe divider ──────────────────────────────────────────────── */
@@ -80,9 +101,12 @@
   <div id="left-label">Original 10m</div>
   <div id="right-label">SR</div>
 
-  <!-- Method selector -->
+  <!-- Controls panel -->
   <div id="controls">
-    <div id="controls-label">SR Method &mdash; Aug 27 2024 &middot; Gaza Strip</div>
+    <div class="row-label">Location</div>
+    <div id="location-row"></div>
+    <hr id="controls-divider">
+    <div id="controls-label">SR Method</div>
     <div id="method-row"></div>
   </div>
 
@@ -95,25 +119,13 @@
         <tr><td colspan="3" style="color:rgba(255,255,255,0.25)">Loading&hellip;</td></tr>
       </tbody>
     </table>
-    <div id="scores-note">Scores vs. real VENuS 5m ground truth.<br>Visual: Sentinel-2 L2A, MGRS 36RXV.</div>
+    <div id="scores-note">Scores vs. real VENuS 5m ground truth.<br>Visual: Sentinel-2 L2A.</div>
   </div>
 
   <script>
     const TILES = "http://localhost:8002/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png";
-    const IMAGERY_BOUNDS = L.latLngBounds([[30.626, 34.044], [31.631, 35.212]]);
 
-    const map = L.map("map", {
-      maxBounds: IMAGERY_BOUNDS, maxBoundsViscosity: 1.0,
-      minZoom: 11, maxZoom: 18,
-    }).setView([31.38, 34.40], 13);
-
-    function updateMinZoom() {
-      const z = map.getBoundsZoom(IMAGERY_BOUNDS) + 1;
-      map.setMinZoom(z);
-      if (map.getZoom() < z) map.setZoom(z);
-    }
-    map.on("resize", updateMinZoom);
-    map.whenReady(updateMinZoom);
+    const map = L.map("map", { minZoom: 3, maxZoom: 18 }).setView([31.38, 34.40], 13);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap contributors",
@@ -142,7 +154,6 @@
       map.getPane("leftPane").style.clip  = "rect(" + nw.y + "px," + clipX + "px," + se.y + "px," + nw.x + "px)";
       map.getPane("rightPane").style.clip = "rect(" + nw.y + "px," + se.x  + "px," + se.y + "px," + clipX + "px)";
 
-      // Keep right label inside the right panel
       rightLabel.style.right = (w - px + 8) + "px";
     }
 
@@ -162,15 +173,48 @@
     map.on("move zoom resize moveend zoomend", function() { requestAnimationFrame(updateClip); });
 
     // ── State ────────────────────────────────────────────────────────
-    var originalPath = null, srMethods = {}, currentMethod = null;
+    var locations = [], currentLocation = null;
     var leftLayer = null, rightLayer = null;
 
     function tileUrl(path) {
       return TILES + "?url=" + encodeURIComponent(path);
     }
 
+    // ── Select a location ────────────────────────────────────────────
+    function selectLocation(id) {
+      currentLocation = locations.find(function(l) { return l.id === id; });
+      if (!currentLocation) return;
+
+      document.querySelectorAll(".loc-btn").forEach(function(b) {
+        b.classList.toggle("active", b.dataset.locId === id);
+      });
+
+      // Fly to new location
+      map.flyTo(currentLocation.center, currentLocation.zoom, { duration: 1.2 });
+
+      // Rebuild method buttons for this location's available methods
+      var methodRow = document.getElementById("method-row");
+      methodRow.innerHTML = "";
+      var methods = Object.keys(currentLocation.methods);
+      methods.forEach(function(name) {
+        var btn = document.createElement("button");
+        btn.className = "method-btn";
+        btn.textContent = name;
+        btn.dataset.method = name;
+        btn.onclick = function() { loadMethod(name); };
+        methodRow.appendChild(btn);
+      });
+
+      document.getElementById("controls-label").textContent =
+        "SR Method \u2014 " + currentLocation.date + " \u00B7 " + currentLocation.name;
+
+      if (methods.length) loadMethod(methods[0]);
+    }
+
+    // ── Load a SR method for the current location ────────────────────
     function loadMethod(name) {
-      currentMethod = name;
+      if (!currentLocation) return;
+
       document.querySelectorAll(".method-btn").forEach(function(b) {
         b.classList.toggle("active", b.dataset.method === name);
       });
@@ -182,15 +226,12 @@
       if (leftLayer)  { map.removeLayer(leftLayer);  leftLayer  = null; }
       if (rightLayer) { map.removeLayer(rightLayer); rightLayer = null; }
 
-      if (originalPath) {
-        leftLayer = L.tileLayer(tileUrl(originalPath),
-          { pane: "leftPane", opacity: 0.88, attribution: "Copernicus Sentinel-2" }).addTo(map);
-      }
+      leftLayer = L.tileLayer(tileUrl(currentLocation.tci_path),
+        { pane: "leftPane", opacity: 0.88, attribution: "Copernicus Sentinel-2" }).addTo(map);
 
-      var scenes = srMethods[name] || [];
-      var scene  = scenes.find(function(s) { return s.date === "2024-08-27"; }) || scenes[0];
-      if (scene) {
-        rightLayer = L.tileLayer(tileUrl(scene.path),
+      var srPath = currentLocation.methods[name];
+      if (srPath) {
+        rightLayer = L.tileLayer(tileUrl(srPath),
           { pane: "rightPane", opacity: 0.88, attribution: "Copernicus Sentinel-2 SR" }).addTo(map);
       }
 
@@ -199,32 +240,22 @@
 
     // ── Bootstrap ────────────────────────────────────────────────────
     async function init() {
-      var results = await Promise.all([
-        fetch("/scenes").then(function(r) { return r.json(); }),
-        fetch("/sr/scenes").then(function(r) { return r.json(); }),
+      var [locData, resultsData] = await Promise.all([
+        fetch("/locations").then(function(r) { return r.json(); }),
         fetch("/results").then(function(r) { return r.json(); }).catch(function() { return {}; }),
       ]);
-      var tciData = results[0], srData = results[1], resultsData = results[2];
 
-      // Use Aug 27 as the reference original
-      var scenes = tciData.scenes || [];
-      var aug27  = scenes.find(function(s) { return s.date === "2024-08-27"; }) || scenes[0];
-      if (aug27) originalPath = aug27.path;
+      locations = locData;
 
-      srMethods = srData.methods || {};
-
-      // Build method buttons — only methods that have an Aug 27 scene
-      var methodRow = document.getElementById("method-row");
-      var methods = Object.keys(srMethods).filter(function(name) {
-        return srMethods[name].some(function(s) { return s.date === "2024-08-27"; });
-      });
-      methods.forEach(function(name) {
+      // Build location buttons
+      var locRow = document.getElementById("location-row");
+      locations.forEach(function(loc) {
         var btn = document.createElement("button");
-        btn.className = "method-btn";
-        btn.textContent = name;
-        btn.dataset.method = name;
-        btn.onclick = function() { loadMethod(name); };
-        methodRow.appendChild(btn);
+        btn.className = "loc-btn";
+        btn.textContent = loc.name;
+        btn.dataset.locId = loc.id;
+        btn.onclick = function() { selectLocation(loc.id); };
+        locRow.appendChild(btn);
       });
 
       // Populate benchmark scores
@@ -245,7 +276,7 @@
         });
       }
 
-      if (methods.length) loadMethod(methods[0]);
+      if (locations.length) selectLocation(locations[0].id);
     }
 
     init();
