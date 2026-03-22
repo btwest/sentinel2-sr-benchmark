@@ -61,6 +61,8 @@ Vehicle and structure detail on a military ramp. EVOLAND uses raw reflectance ba
 
 ## Models
 
+> **Radiometric note:** EVOLAND and the custom SRGAN operate on raw Sentinel-2 reflectance bands (B02/B03/B04/B08 in physical units [0, 10000]) and were trained against radiometrically calibrated ground truth (VENµS and NAIP respectively). As a result, both models implicitly learn to correct brightness and atmospheric inconsistencies as part of the reconstruction — overexposed regions in the native TCI are visibly corrected in their outputs. Real-ESRGAN takes the pre-rendered TCI RGB as input and was trained on natural photos; it has no concept of satellite radiometry and does not correct overexposure. For ISR applications where radiometric accuracy matters (change detection, spectral signature matching, target classification), models that operate in physical reflectance units are preferable to those that sharpen a display-ready image.
+
 **Bicubic / Lanczos** — classical pixel interpolation using fixed convolution kernels. No parameters. Fast, deterministic, strong PSNR baselines.
 
 **EVOLAND** ([sentinel2_superresolution](https://framagit.org/jmichel-otb/sentinel2_superresolution)) — a CARN (Cascading Residual Network) trained on paired Sentinel-2 (10m) / VENµS (5m) acquisitions. Takes raw reflectance bands B02/B03/B04/B08 as input. Developed by CESBIO/CNES. Inference via ONNX (`s2v2x2_spatrad.onnx`), tiles processed with 33px reflect-padded margins to suppress boundary artifacts.
