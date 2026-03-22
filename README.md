@@ -3,7 +3,7 @@
 Benchmarks and visual comparison of super-resolution techniques applied to Sentinel-2 L2A satellite imagery over three strategically significant locations. Includes classical interpolation, a satellite-domain CNN, a general-purpose GAN, and a custom model trained from scratch on paired satellite data.
 
 ![Strait of Hormuz — 10m native vs SRGAN 4×](screenshots/strait_of_hormuz_SRGAN.gif)
-*Port of Bandar Abbas, Strait of Hormuz — Sentinel-2 10m native (left) vs custom SRGAN 4× output (right)*
+*Qeshm Island, Strait of Hormuz — Sentinel-2 10m native (left) vs custom SRGAN 4× output (right)*
 
 ---
 
