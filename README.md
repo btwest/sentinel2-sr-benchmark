@@ -53,7 +53,7 @@ Vehicle and structure detail on a military ramp. EVOLAND uses raw reflectance ba
 
 ![Israel fields: Real-ESRGAN](screenshots/isreal_fields_ESGRAN.gif)
 
-### Ramstein Air Base — scene selector
+### Ramstein Air Base — 10m native vs EVOLAND 2×
 
 ![Ramstein Air Base: EVOLAND](screenshots/rammstein_airbase_EVOLAND.gif)
 
