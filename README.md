@@ -2,6 +2,9 @@
 
 Benchmarks and visual comparison of super-resolution techniques applied to Sentinel-2 L2A satellite imagery over three strategically significant locations. Includes classical interpolation, a satellite-domain CNN, a general-purpose GAN, and a custom model trained from scratch on paired satellite data.
 
+![Strait of Hormuz — 10m native vs SRGAN 4×](screenshots/strait_of_hormuz_SRGAN.gif)
+*Port of Bandar Abbas, Strait of Hormuz — Sentinel-2 10m native (left) vs custom SRGAN 4× output (right)*
+
 ---
 
 ## Scenes
@@ -28,6 +31,32 @@ All scenes are Sentinel-2 L2A (10m, atmospherically corrected), downloaded from 
 
 Benchmark scores computed on 60 test patches from the SEN2VENµS dataset (Amazon rainforest site, 128×128px patches). See [Benchmark Notes](#benchmark-notes).
 
+![SR Benchmark Results](screenshots/benchmark-table.png)
+
+---
+
+## Visual Comparisons
+
+### Agricultural fields — 10m native vs SRGAN 4×
+
+![Israel fields: 10m left, SRGAN right](screenshots/israel_fields_10mleft_SRGANright.png)
+
+The pixelation of individual field rows at native 10m resolution (left) vs. sub-field structure resolved by the 4× SRGAN (right). Note the finer boundary detail between crop types.
+
+### Military installation — 10m native vs EVOLAND 2×
+
+![10m left, EVOLAND right](screenshots/senintel10mleft-evolandright.png)
+
+Vehicle and structure detail on a military ramp. EVOLAND uses raw reflectance bands (B02/B03/B04/B08) as input rather than the pre-rendered TCI, giving it access to radiometrically uncorrupted data.
+
+### Real-ESRGAN — animated swipe compare
+
+![Israel fields: Real-ESRGAN](screenshots/isreal_fields_ESGRAN.gif)
+
+### Ramstein Air Base — scene selector
+
+![Ramstein Air Base: EVOLAND](screenshots/rammstein_airbase_EVOLAND.gif)
+
 ---
 
 ## Models
@@ -40,7 +69,7 @@ Benchmark scores computed on 60 test patches from the SEN2VENµS dataset (Amazon
 
 **OpenSR-SRGAN (custom)** — RRDB-ESRGAN generator with a PatchGAN discriminator, trained from scratch on the [SEN2NAIP](https://huggingface.co/datasets/isp-uv-es/SEN2NAIP) dataset (8,000 paired Sentinel-2 / NAIP samples). 4× scale (10m → 2.5m equivalent). Trained with PyTorch Lightning + WandB monitoring; best checkpoint at epoch 32 of 79.
 
-The SRGAN's lower PSNR reflects two factors: (1) it is solving a harder 4× task vs. the other methods' 2×, making pixel-accurate reconstruction fundamentally more difficult; (2) adversarial training intentionally trades PSNR for perceptual sharpness — GAN outputs are penalized by PSNR metrics for synthesizing plausible high-frequency detail that doesn't match ground truth exactly. The discriminator showed dominance from early training (a known GAN instability), which limited the adversarial component's contribution; retraining with longer generator pre-training is a documented next step.
+The SRGAN's lower PSNR reflects two factors: (1) it is solving a harder 4× task vs. the other methods' 2×, making pixel-accurate reconstruction fundamentally more difficult; (2) adversarial training intentionally trades PSNR for perceptual sharpness — GAN outputs are penalized by PSNR metrics for synthesizing plausible high-frequency detail that doesn't match ground truth exactly. The discriminator showed dominance from early training (a known GAN instability); retraining with longer generator pre-training is a documented next step.
 
 ---
 
